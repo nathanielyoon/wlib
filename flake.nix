@@ -1,0 +1,144 @@
+{
+  inputs.nixpkgs.url = "github:NixOS/nixpkgs/nixos-unstable";
+  outputs =
+    { self, nixpkgs }:
+    {
+      lib.wlib = nixpkgs.lib.genAttrs nixpkgs.lib.systems.flakeExposed (
+        system:
+        let
+          pkgs = nixpkgs.legacyPackages.${system};
+          inherit (pkgs) lib;
+          make = value: "\"${lib.escape [ "\"" "\\" ] (lib.generators.mkValueStringDefault { } value)}\"";
+          args =
+            flags:
+            let
+              join = flags."" or " ";
+              line =
+                if builtins.isFunction join then
+                  join
+                else
+                  name: value: lib.escape [ join ] name + (if value == null then "" else join + make value);
+            in
+            removeAttrs flags [ "" ]
+            |> builtins.mapAttrs (_: lib.toList)
+            |> lib.mapAttrsToList (name: map <| line name)
+            |> builtins.concatLists;
+          link =
+            source:
+            pkgs.runCommandLocal (baseNameOf source) { } ''
+              ln -s ${lib.escapeShellArg source} ${placeholder "out"}
+            '';
+          file =
+            name: type: value:
+            if type == "text" then
+              pkgs.writeText name (
+                if builtins.isString value then
+                  value
+                else
+                  builtins.concatStringsSep "\n" (if builtins.isAttrs value then args value else value) + "\n"
+              )
+            else
+              (pkgs.formats.${type} { }).generate "${name}${if lib.hasSuffix "." name then type else ""}" value;
+          core =
+            { config, extendModules, ... }:
+            {
+              options = {
+                package = lib.mkOption {
+                  description = "Package to wrap.";
+                  type = lib.types.package;
+                };
+                exe = lib.mkOption {
+                  description = "Relative path to the package's executable.";
+                  type = lib.types.str;
+                  default = lib.getExe config.package |> lib.removePrefix (toString config.package);
+                };
+                name = lib.mkOption {
+                  description = "Name of final binary.";
+                  type = lib.types.str;
+                  default = baseNameOf config.exe;
+                };
+                inputs = lib.mkOption {
+                  description = "Other packages in $PATH.";
+                  type = lib.types.listOf lib.types.package;
+                  default = [ ];
+                };
+                above = lib.mkOption {
+                  description = "Flags before passed arguments.";
+                  type = lib.types.listOf lib.types.str;
+                  default = [ ];
+                };
+                below = lib.mkOption {
+                  description = "Flags after passed arguments.";
+                  type = lib.types.listOf lib.types.str;
+                  default = [ ];
+                };
+                env = lib.mkOption {
+                  description = "Environment variables.";
+                  type = lib.types.attrsOf lib.types.anything;
+                  default = { };
+                };
+                final = lib.mkOption {
+                  description = "Wrapped package.";
+                  type = lib.types.package;
+                  readOnly = true;
+                  default =
+                    let
+                      exe = "${placeholder "out"}/bin/${config.name}";
+                      args =
+                        [ "${config.package}/${lib.removePrefix "/" config.exe}" ]
+                        ++ config.above
+                        ++ [ "\"$@\"" ]
+                        ++ config.below
+                        |> builtins.concatStringsSep " \\\n    ";
+                      env = lib.concatMapAttrsStringSep "\n" (name: value: "export ${name}=${make value}") config.env;
+                    in
+                    pkgs.symlinkJoin {
+                      inherit (config) name;
+                      paths = [ config.package ] ++ config.inputs;
+                      postBuild = ''
+                        rm -f ${exe}
+                        cat >${exe} <<'EOF'
+                        #!${pkgs.runtimeShell}
+                        set -euo pipefail
+
+                        ${env}
+                        exec -a ${config.name} ${args}
+                        EOF
+                        chmod +x ${exe}
+                      '';
+                    };
+                };
+                wrap = lib.mkOption {
+                  description = "Extends with options and/or configuration.";
+                  type = lib.types.functionTo lib.types.raw;
+                  readOnly = true;
+                  default = use: (extendModules { modules = lib.toList use; }).config;
+                };
+              };
+            };
+          wrap =
+            module:
+            (lib.evalModules {
+              specialArgs = { inherit pkgs wlib; };
+              modules = [ core ] ++ lib.toList module;
+            }).config;
+          wlib = {
+            inherit
+              make
+              args
+              link
+              file
+              wrap
+              ;
+            default =
+              package: module:
+              (wrap [
+                { inherit package; }
+                module
+              ]).final;
+          };
+        in
+        wlib
+      );
+    };
+}
