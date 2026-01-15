@@ -8,6 +8,34 @@
         let
           pkgs = nixpkgs.legacyPackages.${system};
           inherit (pkgs) lib;
+          types = {
+            value = lib.types.nullOr (
+              lib.types.oneOf [
+                lib.types.bool
+                lib.types.number
+                lib.types.str
+                lib.types.path
+                (lib.types.functionTo (lib.types.functionTo lib.types.str))
+              ]
+            );
+            args = lib.types.listOf lib.types.str;
+            file =
+              lib.genAttrs [
+                "gitIni"
+                "ini"
+                "iniWithGlobalSection"
+                "json"
+                "toml"
+                "yaml"
+              ] (format: (pkgs.formats.${format} { }).type)
+              // {
+                text =
+                  let
+                    either = lib.types.either lib.types.str (lib.types.attrsOf types.value);
+                  in
+                  lib.types.either either (lib.types.listOf either);
+              };
+          };
           escape = value: "\"${lib.escape [ "\"" "\\" ] (lib.generators.mkValueStringDefault { } value)}\"";
           args =
             flags:
@@ -61,17 +89,17 @@
                 };
                 above = lib.mkOption {
                   description = "Flags before passed arguments.";
-                  type = lib.types.listOf lib.types.str;
+                  type = types.args;
                   default = [ ];
                 };
                 below = lib.mkOption {
                   description = "Flags after passed arguments.";
-                  type = lib.types.listOf lib.types.str;
+                  type = types.args;
                   default = [ ];
                 };
                 env = lib.mkOption {
                   description = "Environment variables.";
-                  type = lib.types.attrsOf lib.types.anything;
+                  type = lib.types.attrsOf types.value;
                   default = { };
                 };
                 final = lib.mkOption {
@@ -121,6 +149,7 @@
             }).config;
           wlib = {
             inherit
+              types
               escape
               args
               file
