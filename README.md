@@ -27,7 +27,7 @@ Nix wrapper library inspired by
         modules = [
           ({ pkgs, wlib, ... }: {
             environment.systemPackages = [
-              (wlib.default pkgs.bat {
+              (wlib.eval pkgs.bat {
                 env.BAT_CONFIG_PATH = wlib.file "bat-config" "text" {
                   "--style" = "plain";
                   "--paging" = "never";
