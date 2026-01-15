@@ -23,7 +23,7 @@ Nix wrapper library inspired by
     {
       nixosConfigurations.hostname = nixpkgs.lib.nixosSystem {
         inherit system;
-        specialArgs.wlib = inputs.wlib.lib.wlib.${system};
+        specialArgs.wlib = inputs.wlib.lib.${system}.wlib;
         modules = [
           ({ pkgs, wlib, ... }: {
             environment.systemPackages = [

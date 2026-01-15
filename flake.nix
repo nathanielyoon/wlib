@@ -3,7 +3,7 @@
   outputs =
     { self, nixpkgs }:
     {
-      lib.wlib = nixpkgs.lib.genAttrs nixpkgs.lib.systems.flakeExposed (
+      lib = nixpkgs.lib.genAttrs nixpkgs.lib.systems.flakeExposed (
         system:
         let
           pkgs = nixpkgs.legacyPackages.${system};
@@ -35,7 +35,9 @@
                 if builtins.isString value then
                   value
                 else
-                  builtins.concatStringsSep "\n" (if builtins.isAttrs value then args value else value) + "\n"
+                  lib.toList value ++ [ "" ]
+                  |> map (part: if builtins.isAttrs part then args part else part)
+                  |> builtins.concatStringsSep "\n"
               )
             else
               (pkgs.formats.${type} { }).generate "${name}${if lib.hasSuffix "." name then type else ""}" value;
@@ -130,7 +132,7 @@
               file
               wrap
               ;
-            default =
+            eval =
               package: module:
               (wrap [
                 { inherit package; }
@@ -138,7 +140,9 @@
               ]).final;
           };
         in
-        wlib
+        {
+          inherit wlib;
+        }
       );
     };
 }
