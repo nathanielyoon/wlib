@@ -8,7 +8,7 @@
         let
           pkgs = nixpkgs.legacyPackages.${system};
           inherit (pkgs) lib;
-          make = value: "\"${lib.escape [ "\"" "\\" ] (lib.generators.mkValueStringDefault { } value)}\"";
+          escape = value: "\"${lib.escape [ "\"" "\\" ] (lib.generators.mkValueStringDefault { } value)}\"";
           args =
             flags:
             let
@@ -17,17 +17,12 @@
                 if builtins.isFunction join then
                   join
                 else
-                  name: value: lib.escape [ join ] name + (if value == null then "" else join + make value);
+                  name: value: lib.escape [ join ] name + (if value == null then "" else join + escape value);
             in
             removeAttrs flags [ "" ]
             |> builtins.mapAttrs (_: lib.toList)
             |> lib.mapAttrsToList (name: map <| line name)
             |> builtins.concatLists;
-          link =
-            source:
-            pkgs.runCommandLocal (baseNameOf source) { } ''
-              ln -s ${lib.escapeShellArg source} ${placeholder "out"}
-            '';
           file =
             name: type: value:
             if type == "text" then
@@ -92,7 +87,7 @@
                         ++ [ "\"$@\"" ]
                         ++ config.below
                         |> builtins.concatStringsSep " \\\n    ";
-                      env = lib.concatMapAttrsStringSep "\n" (name: value: "export ${name}=${make value}") config.env;
+                      env = lib.concatMapAttrsStringSep "\n" (name: value: "export ${name}=${escape value}") config.env;
                     in
                     pkgs.symlinkJoin {
                       inherit (config) name;
@@ -118,7 +113,7 @@
                 };
               };
             };
-          wrap =
+          make =
             module:
             (lib.evalModules {
               specialArgs = { inherit pkgs wlib; };
@@ -126,15 +121,14 @@
             }).config;
           wlib = {
             inherit
-              make
+              escape
               args
-              link
               file
-              wrap
+              make
               ;
             eval =
               package: module:
-              (wrap [
+              (make [
                 { inherit package; }
                 module
               ]).final;
