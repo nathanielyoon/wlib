@@ -133,15 +133,9 @@
                       '';
                     };
                 };
-                wrap = lib.mkOption {
-                  description = "Extends with options and/or configuration.";
-                  type = lib.types.functionTo lib.types.raw;
-                  readOnly = true;
-                  default = use: (extendModules { modules = lib.toList use; }).config;
-                };
               };
             };
-          make =
+          eval =
             module:
             (lib.evalModules {
               specialArgs = { inherit pkgs wlib; };
@@ -153,11 +147,11 @@
               escape
               args
               file
-              make
+              eval
               ;
-            eval =
+            wrap =
               package: module:
-              (make [
+              (eval [
                 { inherit package; }
                 module
               ]).final;
