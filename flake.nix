@@ -131,6 +131,7 @@
                         EOF
                         chmod +x ${exe}
                       '';
+                      meta.mainProgram = config.name;
                     };
                 };
               };
