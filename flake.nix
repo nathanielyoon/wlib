@@ -135,21 +135,23 @@
                 };
               };
             };
-          eval =
-            modules1: modules2:
-            (lib.evalModules {
-              specialArgs = { inherit pkgs wlib; };
-              modules = [ core ] ++ lib.toList modules1 ++ lib.toList modules2;
-            }).config;
           wlib = {
             inherit
               types
               escape
               args
               file
-              eval
               ;
-            wrap = package: module: (eval { inherit package; } module).final;
+            wrap =
+              package: modules:
+              (lib.evalModules {
+                specialArgs = { inherit pkgs wlib; };
+                modules = [
+                  core
+                  (if lib.isDerivation package then { inherit package; } else package)
+                ]
+                ++ lib.toList modules;
+              }).config.final;
           };
         in
         {
