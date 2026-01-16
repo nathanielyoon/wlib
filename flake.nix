@@ -59,7 +59,7 @@
                   value
                 else
                   lib.toList value ++ [ "" ]
-                  |> map (part: if builtins.isAttrs part then args part else part)
+                  |> builtins.concatMap (part: if builtins.isAttrs part then args part else lib.toList part)
                   |> builtins.concatStringsSep "\n"
               )
             else
