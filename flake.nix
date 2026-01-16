@@ -136,10 +136,10 @@
               };
             };
           eval =
-            module:
+            modules1: modules2:
             (lib.evalModules {
               specialArgs = { inherit pkgs wlib; };
-              modules = [ core ] ++ lib.toList module;
+              modules = [ core ] ++ lib.toList modules1 ++ lib.toList modules2;
             }).config;
           wlib = {
             inherit
@@ -149,12 +149,7 @@
               file
               eval
               ;
-            wrap =
-              package: module:
-              (eval [
-                { inherit package; }
-                module
-              ]).final;
+            wrap = package: module: (eval { inherit package; } module).final;
           };
         in
         {
