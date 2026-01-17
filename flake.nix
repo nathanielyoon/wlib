@@ -92,6 +92,11 @@
                   type = types.args;
                   default = [ ];
                 };
+                positional = lib.mkOption {
+                  description = "Passed positional parameters.";
+                  type = types.args;
+                  default = [ "\"$@\"" ];
+                };
                 below = lib.mkOption {
                   description = "Flags after passed arguments.";
                   type = types.args;
@@ -112,7 +117,7 @@
                       args =
                         [ "${config.package}/${lib.removePrefix "/" config.exe}" ]
                         ++ config.above
-                        ++ [ "\"$@\"" ]
+                        ++ config.positional
                         ++ config.below
                         |> builtins.concatStringsSep " \\\n    ";
                       env = lib.concatMapAttrsStringSep "\n" (name: value: "export ${name}=${escape value}") config.env;
